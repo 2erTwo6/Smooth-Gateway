@@ -1,0 +1,17 @@
+# 忽略所有 Node.js 的本地依赖文件夹
+node_modules
+
+# 忽略 npm 的调试日志
+npm-debug.log
+
+# 忽略 Git 版本控制文件
+.git
+.gitignore
+
+# 忽略 Docker 本身的文件
+Dockerfile
+.dockerignore
+
+# 忽略项目文档
+README.md
+LICENSE
