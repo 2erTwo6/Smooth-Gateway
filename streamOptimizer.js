@@ -1,9 +1,8 @@
-// streamOptimizer.js (修复竞争逻辑的救火版)
+// streamOptimizer.js (终极丝滑平衡版)
 export class StreamOptimizer {
   constructor(config) {
     this.minDelay = config.minDelay || 0.001;
     this.maxDelay = config.maxDelay || 0.015;
-    // 这里的阈值现在用来判断单个包的大小
     this.bufferThreshold = config.bufferThreshold || 30;
   }
 
@@ -11,36 +10,29 @@ export class StreamOptimizer {
     return new Promise(resolve => setTimeout(resolve, seconds * 1000));
   }
 
-  /**
-   * 修复后的逻辑：
-   * 不再使用全局 Buffer，避免多进程抢夺。
-   * 直接对当前传入的文本块进行平滑分发。
-   */
   async *process(text) {
     if (!text) return;
-
     const len = text.length;
+
+    /**
+     * 核心公式：动态步长与动态延迟
+     * 1. 步长(step)：10个字以内的包逐字出，超过10个字的包按比例增加一次出的字数
+     * 2. 延迟(delay)：根据包的长度，在 maxDelay 和 minDelay 之间平滑插值
+     */
     
-    // 如果单个包很大（说明上游在憋大招或者积压了），我们就加大步长，减小延迟
-    if (len > this.bufferThreshold) {
-      // 这里的 5 是步长，意味着大包时一次吐 5 个字
-      for (let i = 0; i < len; i += 5) {
-        yield text.substring(i, i + 5);
-        await this._sleep(this.minDelay);
-      }
-    } 
-    // 如果是常见的小包（1-3个字），这是高频流
-    else if (len <= 3) {
-      // 极速流模式：直接原样吐出，只给极小的延迟或者不延迟
-      // 这样才能跑满 150 Tokens/s
-      yield text;
-      await this._sleep(this.minDelay); 
-    }
-    // 中等大小的包，逐字平滑
-    else {
-      for (const char of text) {
-        yield char;
-        await this._sleep(this.maxDelay);
+    // 步长：最少1个字，最多不超过10个字一组
+    const step = len <= 10 ? 1 : Math.min(Math.ceil(len / 5), 10);
+    
+    // 延迟：根据长度线性平滑收缩，不再有突变
+    const ratio = Math.min(len / this.bufferThreshold, 1);
+    const currentDelay = this.maxDelay - (this.maxDelay - this.minDelay) * ratio;
+
+    for (let i = 0; i < len; i += step) {
+      yield text.substring(i, i + step);
+      
+      // 只有当包比较小的时候，sleep 才有意义，否则直接跑满
+      if (currentDelay > 0.001) {
+        await this._sleep(currentDelay);
       }
     }
   }
