@@ -1,10 +1,10 @@
-// streamOptimizer.js
+// streamOptimizer.js (修复竞争逻辑的救火版)
 export class StreamOptimizer {
   constructor(config) {
-    this.minDelay = config.minDelay || 0.002; // 极速模式下的延迟
-    this.maxDelay = config.maxDelay || 0.02;  // 优雅模式下的延迟
-    this.bufferThreshold = 40; // 缓冲区警戒线：积压超过40个字符就开始“冲刺”
-    this.internalBuffer = "";
+    this.minDelay = config.minDelay || 0.001;
+    this.maxDelay = config.maxDelay || 0.015;
+    // 这里的阈值现在用来判断单个包的大小
+    this.bufferThreshold = config.bufferThreshold || 30;
   }
 
   _sleep(seconds) {
@@ -12,41 +12,35 @@ export class StreamOptimizer {
   }
 
   /**
-   * 核心逻辑：根据当前缓冲区积压情况，动态决定本次吐字量和延迟
+   * 修复后的逻辑：
+   * 不再使用全局 Buffer，避免多进程抢夺。
+   * 直接对当前传入的文本块进行平滑分发。
    */
   async *process(text) {
-    this.internalBuffer += text;
+    if (!text) return;
 
-    while (this.internalBuffer.length > 0) {
-      const backlog = this.internalBuffer.length;
-      let chunkSize = 1;
-      let delay = this.maxDelay;
-
-      if (backlog > this.bufferThreshold * 2) {
-        // 严重积压：进入“狂暴模式”，大块输出，极低延迟
-        chunkSize = Math.min(backlog, 15); 
-        delay = this.minDelay;
-      } else if (backlog > this.bufferThreshold) {
-        // 轻度积压：加速追赶
-        chunkSize = Math.min(backlog, 5);
-        delay = this.minDelay * 2;
-      } else {
-        // 缓冲区轻松：优雅打字机模式
-        chunkSize = 1;
-        // 越接近空缓冲区，延迟越接近 maxDelay
-        const ratio = backlog / this.bufferThreshold;
-        delay = this.maxDelay - (this.maxDelay - this.minDelay) * (1 - ratio);
+    const len = text.length;
+    
+    // 如果单个包很大（说明上游在憋大招或者积压了），我们就加大步长，减小延迟
+    if (len > this.bufferThreshold) {
+      // 这里的 5 是步长，意味着大包时一次吐 5 个字
+      for (let i = 0; i < len; i += 5) {
+        yield text.substring(i, i + 5);
+        await this._sleep(this.minDelay);
       }
-
-      // 提取并输出
-      const part = this.internalBuffer.substring(0, chunkSize);
-      this.internalBuffer = this.internalBuffer.substring(chunkSize);
-      
-      yield part;
-
-      // 关键：如果上游速度极快，我们需要通过减小 sleep 时间来让路
-      if (delay > 0) {
-        await this._sleep(delay);
+    } 
+    // 如果是常见的小包（1-3个字），这是高频流
+    else if (len <= 3) {
+      // 极速流模式：直接原样吐出，只给极小的延迟或者不延迟
+      // 这样才能跑满 150 Tokens/s
+      yield text;
+      await this._sleep(this.minDelay); 
+    }
+    // 中等大小的包，逐字平滑
+    else {
+      for (const char of text) {
+        yield char;
+        await this._sleep(this.maxDelay);
       }
     }
   }
