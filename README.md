@@ -36,24 +36,24 @@
 
 1.  **一键下载并解压**
 
-    选择以下任一命令执行即可。它会自动下载 **v0.8** 版本并解压。
+    选择以下任一命令执行即可。它会自动下载 **v1.0** 版本并解压。
     > **提示**: 当项目发布新版本时，只需修改命令中的版本号即可下载新版，每当在推送发行版时，我都会顺带地在这里把版本号改为最新的，当然有时候可能会忘记，诸位就自行修改吧（）
 
     *   **使用 `curl` (推荐，macOS 和多数 Linux 自带):**
         ```bash
-        curl -L https://github.com/2erTwo6/Smooth-Gateway/archive/refs/tags/v0.8.tar.gz | tar -xz
+        curl -L https://github.com/2erTwo6/Smooth-Gateway/archive/refs/tags/v1.0.tar.gz | tar -xz
         ```
     *   **或者使用 `wget`:**
         ```bash
-        wget -qO- https://github.com/2erTwo6/Smooth-Gateway/archive/refs/tags/v0.8.tar.gz | tar -xz
+        wget -qO- https://github.com/2erTwo6/Smooth-Gateway/archive/refs/tags/v1.0.tar.gz | tar -xz
         ```
 
 2.  **进入目录并配置**
 
-    上一步的命令会解压出一个名为 `Smooth-Gateway-0.8` 的文件夹。
+    上一步的命令会解压出一个名为 `Smooth-Gateway-1.0` 的文件夹。
     ```bash
     # 注意！文件夹名包含版本号，请根据实际情况修改
-    cd Smooth-Gateway-0.8
+    cd Smooth-Gateway-1.0
 
     # 复制配置文件
     cp .env.example .env
